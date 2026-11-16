@@ -5,12 +5,13 @@ namespace PruebaTecnicaInnova.Repositories
     public class InMemoryProductRepository : IProductRepository
     {
         private static readonly List<Product> products = [];
-        private readonly List<Product> _products = products;
+        private readonly List<Product> _products = [];
         private int _nextId = 1;
+
 
         public InMemoryProductRepository()
         {
-            if (products.Count == 0)
+            if (_products.Count == 0)
             {
                 _products.Add(new Product { Id = _nextId++, Name = "PC Gamer", Description = "PC gaming 1TB", Price = 1500.00m });
                 _products.Add(new Product { Id = _nextId++, Name = "Iphone 16", Description = "Teléfono con cámara de alta resolución", Price = 800.00m });
@@ -46,17 +47,29 @@ namespace PruebaTecnicaInnova.Repositories
             return await Task.FromResult(product);
         }
 
-        public async Task<Product> UpdateProductAsync(Product product)
+
+        public async Task<Product?> UpdateProductAsync(Product product)
         {
             ArgumentNullException.ThrowIfNull(product);
 
-            var existingProduct = _products.FirstOrDefault(p => p.Id == product.Id) ?? throw new KeyNotFoundException($"No se encontró el producto con Id {product.Id}");
+            // Buscar el producto por su identificador
+            var existingProduct = _products
+                .FirstOrDefault(p => p.Id == product.Id);
+
+            // Si no existe, devolver null
+            if (existingProduct is null)
+            {
+                return null;
+            }
+
+            // Actualizar únicamente el producto encontrado
             existingProduct.Name = product.Name;
             existingProduct.Description = product.Description;
             existingProduct.Price = product.Price;
 
             return await Task.FromResult(existingProduct);
         }
+
 
         public async Task<bool> DeleteProductAsync(int id)
         {
