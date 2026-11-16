@@ -4,9 +4,10 @@ namespace PruebaTecnicaInnova.Repositories
 {
     public class InMemoryProductRepository : IProductRepository
     {
-        private static readonly List<Product> products = [];
+        private readonly object _sync = new();
         private readonly List<Product> _products = [];
         private int _nextId = 1;
+
 
 
         public InMemoryProductRepository()
@@ -27,63 +28,95 @@ namespace PruebaTecnicaInnova.Repositories
             return _nextId;
         }
 
-        public async Task<IEnumerable<Product>> GetAllProductsAsync()
+
+        public Task<IEnumerable<Product>> GetAllProductsAsync()
         {
-            return await Task.FromResult(_products.AsEnumerable());
-        }
-
-        public async Task<Product?> GetProductByIdAsync(int id)
-        {
-            var product = _products.FirstOrDefault(p => p.Id == id);
-            return await Task.FromResult(product);
-        }
-
-        public async Task<Product> AddProductAsync(Product product)
-        {
-            ArgumentNullException.ThrowIfNull(product);
-
-            product.Id = _nextId++;
-            _products.Add(product);
-            return await Task.FromResult(product);
-        }
-
-
-        public async Task<Product?> UpdateProductAsync(Product product)
-        {
-            ArgumentNullException.ThrowIfNull(product);
-
-            // Buscar el producto por su identificador
-            var existingProduct = _products
-                .FirstOrDefault(p => p.Id == product.Id);
-
-            // Si no existe, devolver null
-            if (existingProduct is null)
+            lock (_sync)
             {
-                return null;
+                var products = _products.ToList();
+
+                return Task.FromResult<IEnumerable<Product>>(
+                    products
+                );
             }
-
-            // Actualizar únicamente el producto encontrado
-            existingProduct.Name = product.Name;
-            existingProduct.Description = product.Description;
-            existingProduct.Price = product.Price;
-
-            return await Task.FromResult(existingProduct);
         }
 
-
-        public async Task<bool> DeleteProductAsync(int id)
+        public Task<Product?> GetProductByIdAsync(int id)
         {
-            var productRemove = _products.FirstOrDefault(p => p.Id == id);
-            if (productRemove == null) return await Task.FromResult(false);
+            lock (_sync)
+            {
+                var product = _products
+                    .FirstOrDefault(p => p.Id == id);
 
-            _products.Remove(productRemove);
-            return await Task.FromResult(true);
+                return Task.FromResult(product);
+            }
         }
 
+        public Task<Product> AddProductAsync(Product product)
+        {
+            ArgumentNullException.ThrowIfNull(product);
+
+            lock (_sync)
+            {
+                product.Id = _nextId++;
+
+                _products.Add(product);
+
+                return Task.FromResult(product);
+            }
+        }
+        public Task<Product?> UpdateProductAsync(Product product)
+        {
+            ArgumentNullException.ThrowIfNull(product);
+
+            lock (_sync)
+            {
+                var existingProduct = _products
+                    .FirstOrDefault(p => p.Id == product.Id);
+
+                if (existingProduct is null)
+                {
+                    return Task.FromResult<Product?>(null);
+                }
+
+                existingProduct.Name = product.Name;
+                existingProduct.Description = product.Description;
+                existingProduct.Price = product.Price;
+
+                return Task.FromResult<Product?>(existingProduct);
+            }
+        }
+        public Task<bool> DeleteProductAsync(int id)
+        {
+            lock (_sync)
+            {
+                var product = _products
+                    .FirstOrDefault(p => p.Id == id);
+
+                if (product is null)
+                {
+                    return Task.FromResult(false);
+                }
+
+                _products.Remove(product);
+
+                return Task.FromResult(true);
+            }
+        }
         // Método para obtener productos por precio mínimo Simulacion de Consulta
-        public async Task<IEnumerable<Product>> GetProductsByMinPriceAsync(decimal minPrice)
+        public Task<IEnumerable<Product>> GetProductsByMinPriceAsync(
+            decimal minPrice)
         {
-            return await Task.FromResult(_products.Where(p => p.Price >= minPrice).ToList());
+            lock (_sync)
+            {
+                var products = _products
+                    .Where(p => p.Price >= minPrice)
+                    .ToList();
+
+                return Task.FromResult<IEnumerable<Product>>(
+                    products
+                );
+            }
         }
     }
 }

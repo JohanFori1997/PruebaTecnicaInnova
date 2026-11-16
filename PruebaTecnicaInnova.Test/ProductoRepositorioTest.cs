@@ -1,5 +1,7 @@
+
 using PruebaTecnicaInnova.Models;
 using PruebaTecnicaInnova.Repositories;
+using System.Threading;
 
 namespace PruebaTecnicaInnova.Test
 {
@@ -90,6 +92,64 @@ namespace PruebaTecnicaInnova.Test
                 allProducts.Select(p => p.Id).Distinct().Count()
             );
         }
+
+        [Fact]
+        public async Task AddProductAsync_ConcurrentRequests_ShouldKeepUniqueIds()
+        {
+            // ARRANGE
+            var repository = new InMemoryProductRepository();
+
+            int initialCount = (await repository
+                .GetAllProductsAsync()).Count();
+
+            const int requests = 100;
+
+            using var startSignal = new ManualResetEventSlim(false);
+
+            // Preparar operaciones concurrentes
+            var tasks = Enumerable.Range(0, requests)
+                .Select(i => Task.Run(async () =>
+                {
+                    startSignal.Wait();
+
+                    var product = new Product
+                    {
+                        Name = $"Producto {i:D3}",
+                        Description = "Prueba de concurrencia",
+                        Price = 100m + i
+                    };
+
+                    return await repository.AddProductAsync(product);
+                }))
+                .ToArray();
+
+            // ACT: permitir que las tareas avancen
+            startSignal.Set();
+
+            var createdProducts = await Task.WhenAll(tasks);
+
+            var allProducts = (await repository
+                .GetAllProductsAsync()).ToList();
+
+            // ASSERT 1: no se deben perder productos
+            Assert.Equal(
+                initialCount + requests,
+                allProducts.Count
+            );
+
+            // ASSERT 2: todos los IDs deben ser únicos
+            Assert.Equal(
+                allProducts.Count,
+                allProducts.Select(p => p.Id).Distinct().Count()
+            );
+
+            // ASSERT 3: los nuevos productos tienen IDs distintos
+            Assert.Equal(
+                requests,
+                createdProducts.Select(p => p.Id).Distinct().Count()
+            );
+        }
+
 
     }
 }
