@@ -1,4 +1,5 @@
 ﻿using Microsoft.AspNetCore.Mvc;
+using PruebaTecnicaInnova.Dtos;
 using PruebaTecnicaInnova.Models;
 using PruebaTecnicaInnova.Repositories;
 
@@ -47,17 +48,38 @@ namespace PruebaTecnicaInnova.Controllers
         }
 
         // POST api/Products
-        [HttpPost]
-        public async Task<ActionResult<Product>> PostProduct(Product product)
-        {
-            if (!ModelState.IsValid)
-            {
-                return BadRequest(ModelState);
-            }
 
-            var createdProduct = await _productRepository.AddProductAsync(product);
-            return CreatedAtAction(nameof(GetProduct), new { id = createdProduct.Id }, createdProduct);
+        [HttpPost]
+        public async Task<ActionResult<ProductResponse>> PostProduct(
+            [FromBody] CreateProductRequest request)
+        {
+            // Convertir el DTO de entrada en una entidad
+            var product = new Product
+            {
+                Name = request.Name,
+                Description = request.Description,
+                Price = request.Price
+            };
+
+            // Persistir mediante el repositorio
+            var createdProduct =
+                await _productRepository.AddProductAsync(product);
+
+            // Preparar la respuesta HTTP
+            var response = new ProductResponse(
+                createdProduct.Id,
+                createdProduct.Name,
+                createdProduct.Description,
+                createdProduct.Price
+            );
+
+            return CreatedAtAction(
+                nameof(GetProduct),
+                new { id = createdProduct.Id },
+                response
+            );
         }
+
 
         // PUT api/Products/5
         [HttpPut("{id}")]
