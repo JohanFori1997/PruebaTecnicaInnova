@@ -2,7 +2,10 @@
 using System.Net.Http.Json;
 using PruebaTecnicaInnova.Models;
 using Microsoft.AspNetCore.Mvc.Testing;
-using Xunit;
+using Microsoft.AspNetCore.TestHost;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using PruebaTecnicaInnova.Repositories;
 
 namespace PruebaTecnicaInnova.Test;
 
@@ -14,11 +17,21 @@ public class ProductsApiIntegrationTests
     public ProductsApiIntegrationTests(
         WebApplicationFactory<Program> factory)
     {
-        _client = factory.CreateClient(
-            new WebApplicationFactoryClientOptions
+        _client = factory.WithWebHostBuilder(builder =>
+        {
+            builder.ConfigureTestServices(services =>
             {
-                BaseAddress = new Uri("https://localhost")
+                services.RemoveAll<IProductRepository>();
+
+                services.AddSingleton<
+                    IProductRepository,
+                    InMemoryProductRepository>();
             });
+        })
+        .CreateClient(new WebApplicationFactoryClientOptions
+        {
+            BaseAddress = new Uri("https://localhost")
+        });
     }
 
     [Theory]
