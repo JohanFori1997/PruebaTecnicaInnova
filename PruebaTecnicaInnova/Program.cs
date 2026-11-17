@@ -1,4 +1,6 @@
 using PruebaTecnicaInnova.Repositories;
+using Microsoft.EntityFrameworkCore;
+using PruebaTecnicaInnova.Data;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -10,7 +12,15 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 // Inyeccion de dependencias para el repositorio en memoria
-builder.Services.AddSingleton<IProductRepository, InMemoryProductRepository>();
+builder.Services.AddScoped<IProductRepository, EfProductRepository>();
+
+
+
+builder.Services.AddDbContext<ProductsDbContext>(options =>
+    options.UseSqlServer(
+        builder.Configuration.GetConnectionString("ProductsDb")
+    )
+);
 
 var app = builder.Build();
 
@@ -28,3 +38,4 @@ app.UseAuthorization();
 app.MapControllers();
 
 app.Run();
+public partial class Program { }

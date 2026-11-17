@@ -1,16 +1,19 @@
-﻿using PruebaTecnicaInnova.Models;
+﻿using PruebaTecnicaInnova.Common;
+using PruebaTecnicaInnova.Models;
 
 namespace PruebaTecnicaInnova.Repositories
 {
     public class InMemoryProductRepository : IProductRepository
     {
-        private static readonly List<Product> products = [];
-        private readonly List<Product> _products = products;
+        private readonly object _sync = new();
+        private readonly List<Product> _products = [];
         private int _nextId = 1;
+
+
 
         public InMemoryProductRepository()
         {
-            if (products.Count == 0)
+            if (_products.Count == 0)
             {
                 _products.Add(new Product { Id = _nextId++, Name = "PC Gamer", Description = "PC gaming 1TB", Price = 1500.00m });
                 _products.Add(new Product { Id = _nextId++, Name = "Iphone 16", Description = "Teléfono con cámara de alta resolución", Price = 800.00m });
@@ -26,51 +29,120 @@ namespace PruebaTecnicaInnova.Repositories
             return _nextId;
         }
 
-        public async Task<IEnumerable<Product>> GetAllProductsAsync()
+
+        public Task<IEnumerable<Product>> GetAllProductsAsync()
         {
-            return await Task.FromResult(_products.AsEnumerable());
+            lock (_sync)
+            {
+                var products = _products.ToList();
+
+                return Task.FromResult<IEnumerable<Product>>(
+                    products
+                );
+            }
         }
 
-        public async Task<Product?> GetProductByIdAsync(int id)
+        public Task<Product?> GetProductByIdAsync(int id)
         {
-            var product = _products.FirstOrDefault(p => p.Id == id);
-            return await Task.FromResult(product);
+            lock (_sync)
+            {
+                var product = _products
+                    .FirstOrDefault(p => p.Id == id);
+
+                return Task.FromResult(product);
+            }
         }
 
-        public async Task<Product> AddProductAsync(Product product)
+        public Task<Product> AddProductAsync(Product product)
         {
             ArgumentNullException.ThrowIfNull(product);
 
-            product.Id = _nextId++;
-            _products.Add(product);
-            return await Task.FromResult(product);
-        }
+            lock (_sync)
+            {
+                product.Id = _nextId++;
 
-        public async Task<Product> UpdateProductAsync(Product product)
+                _products.Add(product);
+
+                return Task.FromResult(product);
+            }
+        }
+        public Task<Product?> UpdateProductAsync(Product product)
         {
             ArgumentNullException.ThrowIfNull(product);
 
-            var existingProduct = _products.FirstOrDefault(p => p.Id == product.Id) ?? throw new KeyNotFoundException($"No se encontró el producto con Id {product.Id}");
-            existingProduct.Name = product.Name;
-            existingProduct.Description = product.Description;
-            existingProduct.Price = product.Price;
+            lock (_sync)
+            {
+                var existingProduct = _products
+                    .FirstOrDefault(p => p.Id == product.Id);
 
-            return await Task.FromResult(existingProduct);
+                if (existingProduct is null)
+                {
+                    return Task.FromResult<Product?>(null);
+                }
+
+                existingProduct.Name = product.Name;
+                existingProduct.Description = product.Description;
+                existingProduct.Price = product.Price;
+
+                return Task.FromResult<Product?>(existingProduct);
+            }
         }
-
-        public async Task<bool> DeleteProductAsync(int id)
+        public Task<bool> DeleteProductAsync(int id)
         {
-            var productRemove = _products.FirstOrDefault(p => p.Id == id);
-            if (productRemove == null) return await Task.FromResult(false);
+            lock (_sync)
+            {
+                var product = _products
+                    .FirstOrDefault(p => p.Id == id);
 
-            _products.Remove(productRemove);
-            return await Task.FromResult(true);
+                if (product is null)
+                {
+                    return Task.FromResult(false);
+                }
+
+                _products.Remove(product);
+
+                return Task.FromResult(true);
+            }
         }
-
         // Método para obtener productos por precio mínimo Simulacion de Consulta
-        public async Task<IEnumerable<Product>> GetProductsByMinPriceAsync(decimal minPrice)
+        public Task<IEnumerable<Product>> GetProductsByMinPriceAsync(
+            decimal minPrice)
         {
-            return await Task.FromResult(_products.Where(p => p.Price >= minPrice).ToList());
+            lock (_sync)
+            {
+                var products = _products
+                    .Where(p => p.Price >= minPrice)
+                    .ToList();
+
+                return Task.FromResult<IEnumerable<Product>>(
+                    products
+                );
+            }
+        }
+        public Task<PagedResult<Product>> GetPagedProductsAsync(
+            int pageNumber,
+            int pageSize)
+        {
+            lock (_sync)
+            {
+                var totalCount = _products.Count;
+
+                var offset = (pageNumber - 1) * pageSize;
+
+                var products = _products
+                    .OrderBy(p => p.Id)
+                    .Skip(offset)
+                    .Take(pageSize)
+                    .ToList();
+
+                var result = new PagedResult<Product>(
+                    products,
+                    pageNumber,
+                    pageSize,
+                    totalCount);
+
+                return Task.FromResult(result);
+            }
         }
     }
 }

@@ -1,0 +1,73 @@
+
+name: .NET 10 CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    name: Build and Test
+    runs-on: windows-2025
+    timeout-minutes: 25
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+
+      - name: Verify .NET version
+        run: dotnet --version
+
+      - name: Start SQL Server LocalDB
+        shell: pwsh
+        run: |
+          $exe = (Get-Command sqllocaldb -ErrorAction SilentlyContinue).Source
+
+          if (-not $exe) {
+            $exe = Get-ChildItem "$env:ProgramFiles\Microsoft SQL Server" `
+              -Filter SqlLocalDB.exe -Recurse -ErrorAction SilentlyContinue |
+              Select-Object -First 1 -ExpandProperty FullName
+          }
+
+          if (-not $exe) {
+            throw "SQL Server LocalDB is not installed on this runner."
+          }
+
+          $instances = @(& $exe info)
+
+          if ("MSSQLLocalDB" -notin $instances) {
+            & $exe create MSSQLLocalDB
+            if ($LASTEXITCODE -ne 0) {
+              throw "Could not create LocalDB instance."
+            }
+          }
+
+          & $exe start MSSQLLocalDB
+          if ($LASTEXITCODE -ne 0) {
+            throw "Could not start LocalDB instance."
+          }
+
+      - name: Restore dependencies
+        run: dotnet restore ./PruebaTecnicaInnova.Test/PruebaTecnicaInnova.Test.csproj
+
+      - name: Build solution
+        run: dotnet build ./PruebaTecnicaInnova.Test/PruebaTecnicaInnova.Test.csproj --configuration Release --no-restore
+
+      - name: Run automated tests
+        run: dotnet test ./PruebaTecnicaInnova.Test/PruebaTecnicaInnova.Test.csproj --configuration Release --no-build --logger "trx;LogFileName=tests.trx" --results-directory ./TestResults
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: TestResults/*.trx
+          if-no-files-found: ignore
