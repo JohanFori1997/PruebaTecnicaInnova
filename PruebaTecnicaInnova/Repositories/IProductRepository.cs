@@ -1,4 +1,5 @@
-﻿using PruebaTecnicaInnova.Models;
+﻿using PruebaTecnicaInnova.Common;
+using PruebaTecnicaInnova.Models;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
@@ -12,5 +13,6 @@ namespace PruebaTecnicaInnova.Repositories
         Task<Product?> UpdateProductAsync(Product product);
         Task<bool> DeleteProductAsync(int id);
         Task<IEnumerable<Product>> GetProductsByMinPriceAsync(decimal minPrice);
+        Task<PagedResult<Product>> GetPagedProductsAsync(int pageNumber, int pageSize);
     }
 }

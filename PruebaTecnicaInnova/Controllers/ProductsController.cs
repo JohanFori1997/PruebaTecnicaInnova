@@ -1,7 +1,9 @@
 ﻿using Microsoft.AspNetCore.Mvc;
+using PruebaTecnicaInnova.Common;
 using PruebaTecnicaInnova.Dtos;
 using PruebaTecnicaInnova.Models;
 using PruebaTecnicaInnova.Repositories;
+using System.ComponentModel.DataAnnotations;
 
 // For more information on enabling Web API for empty projects, visit https://go.microsoft.com/fwlink/?LinkID=397860
 
@@ -14,11 +16,21 @@ namespace PruebaTecnicaInnova.Controllers
         private readonly IProductRepository _productRepository = productRepository;
 
         // GET: api/<ProductsController>
+
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<Product>>> GetProducts()
+        public async Task<ActionResult<IEnumerable<ProductResponse>>>
+            GetProducts()
         {
-            var products = await _productRepository.GetAllProductsAsync();
-            return Ok(products);
+            // Obtener entidades desde el repositorio
+            var products =
+                await _productRepository.GetAllProductsAsync();
+
+            // Convertir entidades a DTOs
+            var response = products
+                .Select(ToResponse)
+                .ToList();
+
+            return Ok(response);
         }
 
         // GET api/Products/5
@@ -47,18 +59,44 @@ namespace PruebaTecnicaInnova.Controllers
 
         // GET api/Products/minprice/100
         [HttpGet("minprice/{minPrice}")]
-        public async Task<ActionResult<IEnumerable<Product>>> GetProductsByMinPrice(decimal minPrice)
+        public async Task<ActionResult<IEnumerable<ProductResponse>>>
+            GetProductsByMinPrice(decimal minPrice)
         {
-            var products = await _productRepository.GetProductsByMinPriceAsync(minPrice);
-            if (products == null || !products.Any())
+            var products = await _productRepository
+                .GetProductsByMinPriceAsync(minPrice);
+
+            var response = products
+                .Select(ToResponse)
+                .ToList();
+
+            if (response.Count == 0)
             {
-                return NotFound($"No se encontraron productos con un precio mínimo de {minPrice}.");
+                return NotFound(
+                    $"No se encontraron productos con un precio mínimo de {minPrice}.");
             }
-            return Ok(products);
+
+            return Ok(response);
+        }
+
+        [HttpGet("paged")]
+        public async Task<ActionResult<PagedResult<ProductResponse>>>
+            GetProductsPaged(
+                [FromQuery, Range(1, 1000000)] int pageNumber = 1,
+                [FromQuery, Range(1, 100)] int pageSize = 20)
+        {
+            var result = await _productRepository
+                .GetPagedProductsAsync(pageNumber, pageSize);
+
+            var response = new PagedResult<ProductResponse>(
+                result.Items.Select(ToResponse).ToList(),
+                result.PageNumber,
+                result.PageSize,
+                result.TotalCount);
+
+            return Ok(response);
         }
 
         // POST api/Products
-
         [HttpPost]
         public async Task<ActionResult<ProductResponse>> PostProduct(
             [FromBody] CreateProductRequest request)
@@ -140,5 +178,15 @@ namespace PruebaTecnicaInnova.Controllers
 
             return NoContent();
         }
+        private static ProductResponse ToResponse(Product product)
+        {
+            return new ProductResponse(
+                product.Id,
+                product.Name,
+                product.Description,
+                product.Price
+            );
+        }
+
     }
 }

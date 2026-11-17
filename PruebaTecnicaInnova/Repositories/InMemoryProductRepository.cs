@@ -1,4 +1,5 @@
-﻿using PruebaTecnicaInnova.Models;
+﻿using PruebaTecnicaInnova.Common;
+using PruebaTecnicaInnova.Models;
 
 namespace PruebaTecnicaInnova.Repositories
 {
@@ -116,6 +117,31 @@ namespace PruebaTecnicaInnova.Repositories
                 return Task.FromResult<IEnumerable<Product>>(
                     products
                 );
+            }
+        }
+        public Task<PagedResult<Product>> GetPagedProductsAsync(
+            int pageNumber,
+            int pageSize)
+        {
+            lock (_sync)
+            {
+                var totalCount = _products.Count;
+
+                var offset = (pageNumber - 1) * pageSize;
+
+                var products = _products
+                    .OrderBy(p => p.Id)
+                    .Skip(offset)
+                    .Take(pageSize)
+                    .ToList();
+
+                var result = new PagedResult<Product>(
+                    products,
+                    pageNumber,
+                    pageSize,
+                    totalCount);
+
+                return Task.FromResult(result);
             }
         }
     }

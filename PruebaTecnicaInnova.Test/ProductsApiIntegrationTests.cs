@@ -222,4 +222,88 @@ public class ProductsApiIntegrationTests
             request.Price,
             root.GetProperty("price").GetDecimal());
     }
+
+    [Theory]
+    [InlineData("/api/Products")]
+    [InlineData("/api/Products/minprice/100")]
+    public async Task GetProducts_ReturnsProductResponseCollection(
+        string endpoint)
+    {
+        // ARRANGE: crear un producto reconocible
+        var request = new CreateProductRequest
+        {
+            Name = $"Producto-{Guid.NewGuid():N}",
+            Description = "Prueba de contrato de colección",
+            Price = 250m
+        };
+
+        var postResponse = await _client.PostAsJsonAsync(
+            "/api/Products",
+            request);
+
+        Assert.Equal(
+            HttpStatusCode.Created,
+            postResponse.StatusCode);
+
+        var created = await postResponse.Content
+            .ReadFromJsonAsync<ProductResponse>();
+
+        Assert.NotNull(created);
+
+        // ACT: consultar la colección
+        var response = await _client.GetAsync(endpoint);
+
+        Assert.Equal(
+            HttpStatusCode.OK,
+            response.StatusCode);
+
+        var json = await response.Content.ReadAsStringAsync();
+
+        using var document = JsonDocument.Parse(json);
+
+        var root = document.RootElement;
+
+        Assert.Equal(JsonValueKind.Array, root.ValueKind);
+        Assert.True(root.GetArrayLength() > 0);
+
+        // ASSERT: validar el contrato de cada producto
+        foreach (var product in root.EnumerateArray())
+        {
+            var properties = product
+                .EnumerateObject()
+                .Select(p => p.Name)
+                .OrderBy(name => name)
+                .ToArray();
+
+            Assert.Equal(
+                new[] { "description", "id", "name", "price" },
+                properties);
+        }
+
+        // Confirmar que el producto creado está en la colección
+        Assert.Contains(
+            root.EnumerateArray(),
+            product =>
+                product.GetProperty("id").GetInt32() == created.Id);
+    }
+
+    [Theory]
+    [InlineData(0, 20)]
+    [InlineData(1, 0)]
+    [InlineData(1, 101)]
+    [InlineData(1000001, 20)]
+    public async Task GetProductsPaged_InvalidParameters_Returns400(
+        int pageNumber,
+        int pageSize)
+    {
+        // ACT
+        var response = await _client.GetAsync(
+            $"/api/Products/paged?pageNumber={pageNumber}" +
+            $"&pageSize={pageSize}");
+
+        // ASSERT
+        Assert.Equal(
+            HttpStatusCode.BadRequest,
+            response.StatusCode);
+    }
 }

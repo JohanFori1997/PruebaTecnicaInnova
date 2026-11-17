@@ -1,5 +1,6 @@
 ﻿
 using Microsoft.EntityFrameworkCore;
+using PruebaTecnicaInnova.Common;
 using PruebaTecnicaInnova.Data;
 using PruebaTecnicaInnova.Models;
 
@@ -13,7 +14,6 @@ public sealed class EfProductRepository : IProductRepository
     {
         _context = context;
     }
-
     public async Task<IEnumerable<Product>> GetAllProductsAsync()
     {
         return await _context.Products
@@ -21,14 +21,12 @@ public sealed class EfProductRepository : IProductRepository
             .OrderBy(p => p.Id)
             .ToListAsync();
     }
-
     public async Task<Product?> GetProductByIdAsync(int id)
     {
         return await _context.Products
             .AsNoTracking()
             .FirstOrDefaultAsync(p => p.Id == id);
     }
-
     public async Task<Product> AddProductAsync(Product product)
     {
         ArgumentNullException.ThrowIfNull(product);
@@ -41,7 +39,6 @@ public sealed class EfProductRepository : IProductRepository
 
         return product;
     }
-
     public async Task<Product?> UpdateProductAsync(Product product)
     {
         ArgumentNullException.ThrowIfNull(product);
@@ -62,7 +59,6 @@ public sealed class EfProductRepository : IProductRepository
 
         return existingProduct;
     }
-
     public async Task<bool> DeleteProductAsync(int id)
     {
         var product = await _context.Products.FindAsync(id);
@@ -77,7 +73,6 @@ public sealed class EfProductRepository : IProductRepository
 
         return true;
     }
-
     public async Task<IEnumerable<Product>> GetProductsByMinPriceAsync(
         decimal minPrice)
     {
@@ -86,5 +81,30 @@ public sealed class EfProductRepository : IProductRepository
             .Where(p => p.Price >= minPrice)
             .OrderBy(p => p.Id)
             .ToListAsync();
+    }
+    public async Task<PagedResult<Product>> GetPagedProductsAsync(
+        int pageNumber,
+        int pageSize)
+    {
+        var query = _context.Products.AsNoTracking();
+
+        // Total de productos en SQL Server
+        var totalCount = await query.CountAsync();
+
+        // Calcular desplazamiento
+        var offset = (pageNumber - 1) * pageSize;
+
+        // Recuperar únicamente la página solicitada
+        var products = await query
+            .OrderBy(p => p.Id)
+            .Skip(offset)
+            .Take(pageSize)
+            .ToListAsync();
+
+        return new PagedResult<Product>(
+            products,
+            pageNumber,
+            pageSize,
+            totalCount);
     }
 }

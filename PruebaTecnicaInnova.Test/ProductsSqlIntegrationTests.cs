@@ -1,8 +1,10 @@
 ﻿
-using System.Net;
-using System.Net.Http.Json;
+using PruebaTecnicaInnova.Common;
+using PruebaTecnicaInnova.Dtos;
 using PruebaTecnicaInnova.Models;
 using PruebaTecnicaInnova.Test.Infrastructure;
+using System.Net;
+using System.Net.Http.Json;
 
 namespace PruebaTecnicaInnova.Test;
 
@@ -135,5 +137,115 @@ public class ProductsSqlIntegrationTests
         Assert.Equal(
             HttpStatusCode.NotFound,
             finalResponse.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetProductsPaged_ShouldReturnCorrectSqlPages()
+    {
+        await using var environment =
+            await SqlServerTestEnvironment.CreateAsync();
+
+        var client = environment.Client;
+        var createdIds = new List<int>();
+
+        // ARRANGE: insertar cinco productos en SQL Server
+        for (int i = 1; i <= 5; i++)
+        {
+            var request = new CreateProductRequest
+            {
+                Name = $"Producto paginado {i}",
+                Description = "Prueba SQL de paginación",
+                Price = 100m * i
+            };
+
+            var postResponse = await client.PostAsJsonAsync(
+                "/api/Products", request);
+
+            Assert.Equal(
+                HttpStatusCode.Created,
+                postResponse.StatusCode);
+
+            var created = await postResponse.Content
+                .ReadFromJsonAsync<ProductResponse>();
+
+            Assert.NotNull(created);
+            createdIds.Add(created.Id);
+        }
+
+        // ACT: solicitar primera y tercera página
+        var firstPage = await client
+            .GetFromJsonAsync<PagedResult<ProductResponse>>(
+                "/api/Products/paged?pageNumber=1&pageSize=2");
+
+        var thirdPage = await client
+            .GetFromJsonAsync<PagedResult<ProductResponse>>(
+                "/api/Products/paged?pageNumber=3&pageSize=2");
+
+        // ASSERT: validar metadatos
+        Assert.NotNull(firstPage);
+        Assert.NotNull(thirdPage);
+
+        Assert.Equal(5, firstPage.TotalCount);
+        Assert.Equal(3, firstPage.TotalPages);
+        Assert.Equal(1, firstPage.PageNumber);
+        Assert.Equal(2, firstPage.PageSize);
+
+        // La primera página contiene dos registros
+        Assert.Equal(2, firstPage.Items.Count);
+
+        // La tercera página contiene uno
+        Assert.Single(thirdPage.Items);
+
+        // Verificar que las páginas respetan el orden por ID
+        Assert.Equal(
+            createdIds.Take(2),
+            firstPage.Items.Select(p => p.Id));
+
+        Assert.Equal(
+            createdIds.Skip(4),
+            thirdPage.Items.Select(p => p.Id));
+    }
+    [Fact]
+    public async Task GetProductsPaged_PageBeyondLast_ReturnsEmptyItems()
+    {
+        // ARRANGE
+        await using var environment =
+            await SqlServerTestEnvironment.CreateAsync();
+
+        var client = environment.Client;
+
+        var request = new CreateProductRequest
+        {
+            Name = "Producto único",
+            Description = "Prueba de página vacía",
+            Price = 100m
+        };
+
+        var postResponse = await client.PostAsJsonAsync(
+            "/api/Products", request);
+
+        Assert.Equal(
+            HttpStatusCode.Created,
+            postResponse.StatusCode);
+
+        // ACT: solicitar la segunda página
+        var response = await client.GetAsync(
+            "/api/Products/paged?pageNumber=2&pageSize=1");
+
+        // ASSERT
+        Assert.Equal(
+            HttpStatusCode.OK,
+            response.StatusCode);
+
+        var result = await response.Content
+            .ReadFromJsonAsync<PagedResult<ProductResponse>>();
+
+        Assert.NotNull(result);
+
+        Assert.Empty(result.Items);
+        Assert.Equal(1, result.TotalCount);
+        Assert.Equal(1, result.TotalPages);
+        Assert.Equal(2, result.PageNumber);
+        Assert.Equal(1, result.PageSize);
     }
 }
