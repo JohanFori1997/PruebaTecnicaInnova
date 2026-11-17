@@ -7,6 +7,7 @@ using PruebaTecnicaInnova.Models;
 using PruebaTecnicaInnova.Repositories;
 using System.Net;
 using System.Net.Http.Json;
+using System.Text.Json;
 
 namespace PruebaTecnicaInnova.Test;
 
@@ -147,5 +148,78 @@ public class ProductsApiIntegrationTests
         Assert.Equal(
             HttpStatusCode.BadRequest,
             response.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetProduct_ReturnsProductResponseContract()
+    {
+        // ARRANGE: crear un producto mediante HTTP
+        var request = new CreateProductRequest
+        {
+            Name = $"Contrato-{Guid.NewGuid():N}",
+            Description = "Prueba del contrato HTTP",
+            Price = 250m
+        };
+
+        var postResponse = await _client.PostAsJsonAsync(
+            "/api/Products",
+            request);
+
+        Assert.Equal(
+            HttpStatusCode.Created,
+            postResponse.StatusCode);
+
+        var created = await postResponse.Content
+            .ReadFromJsonAsync<ProductResponse>();
+
+        Assert.NotNull(created);
+        Assert.True(created.Id > 0);
+
+        // ACT: consultar el producto creado
+        var getResponse = await _client.GetAsync(
+            $"/api/Products/{created.Id}");
+
+        Assert.Equal(
+            HttpStatusCode.OK,
+            getResponse.StatusCode);
+
+        // ASSERT: verificar el contrato JSON
+        var responseBody =
+            await getResponse.Content.ReadAsStringAsync();
+
+        using var document = JsonDocument.Parse(responseBody);
+
+        var root = document.RootElement;
+
+        Assert.Equal(
+            JsonValueKind.Object,
+            root.ValueKind);
+
+        // Solo los cuatro campos definidos por el DTO
+        var properties = root
+            .EnumerateObject()
+            .Select(p => p.Name)
+            .OrderBy(name => name)
+            .ToArray();
+
+        Assert.Equal(
+            new[] { "description", "id", "name", "price" },
+            properties);
+
+        Assert.Equal(
+            created.Id,
+            root.GetProperty("id").GetInt32());
+
+        Assert.Equal(
+            request.Name,
+            root.GetProperty("name").GetString());
+
+        Assert.Equal(
+            request.Description,
+            root.GetProperty("description").GetString());
+
+        Assert.Equal(
+            request.Price,
+            root.GetProperty("price").GetDecimal());
     }
 }

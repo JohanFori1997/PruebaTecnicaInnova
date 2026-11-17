@@ -23,16 +23,26 @@ namespace PruebaTecnicaInnova.Controllers
 
         // GET api/Products/5
         [HttpGet("{id}")]
-        public async Task<ActionResult <Product>> GetProduct(int id)
+        public async Task<ActionResult<ProductResponse>> GetProduct(int id)
         {
-            var product = await _productRepository.GetProductByIdAsync(id);
+            // Consultar la entidad mediante el repositorio
+            var product = await _productRepository
+                .GetProductByIdAsync(id);
 
-            if ( product == null)
+            if (product is null)
             {
                 return NotFound();
             }
 
-            return Ok(product);
+            // Transformar la entidad en un DTO público
+            var response = new ProductResponse(
+                product.Id,
+                product.Name,
+                product.Description,
+                product.Price
+            );
+
+            return Ok(response);
         }
 
         // GET api/Products/minprice/100
