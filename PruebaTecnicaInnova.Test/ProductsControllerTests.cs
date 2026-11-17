@@ -1,7 +1,7 @@
 ﻿
 using Microsoft.AspNetCore.Mvc;
 using PruebaTecnicaInnova.Controllers;
-using PruebaTecnicaInnova.Models;
+using PruebaTecnicaInnova.Dtos;
 using PruebaTecnicaInnova.Repositories;
 using Xunit;
 
@@ -9,32 +9,38 @@ namespace PruebaTecnicaInnova.Test;
 
 public class ProductsControllerTests
 {
+
     [Fact]
     public async Task PutProduct_WhenIdDoesNotExist_Returns404()
     {
-        // Arrange: preparar un producto inexistente
+        // ARRANGE
         var repository = new InMemoryProductRepository();
         var controller = new ProductsController(repository);
 
-        var product = new Product
+        const int nonexistentId = 999999;
+
+        // Confirmar que el producto realmente no existe
+        var existingProduct =
+            await repository.GetProductByIdAsync(nonexistentId);
+
+        Assert.Null(existingProduct);
+
+        var request = new UpdateProductRequest
         {
-            Id = 999999,
-            Name = "Producto de prueba",
+            Id = nonexistentId,
+            Name = "Producto inexistente",
             Description = "Prueba de actualización",
-            Price = 100m
+            Price = 150m
         };
 
-        // Act: intentar actualizar el producto
+        // ACT
         var result = await controller.PutProduct(
-            product.Id, product);
+            nonexistentId,
+            request);
 
-        // Assert: comprobar la respuesta esperada
-        var notFound = Assert.IsType<NotFoundObjectResult>(
-            result);
-
-        Assert.Equal(404, notFound.StatusCode);
+        // ASSERT
+        Assert.IsType<NotFoundObjectResult>(result);
     }
-
 
     [Fact]
     public async Task PutProduct_WhenProductExists_Returns204()
@@ -44,12 +50,12 @@ public class ProductsControllerTests
         var controller = new ProductsController(repository);
 
         // El producto con ID 1 existe en los datos iniciales
-        var updatedProduct = new Product
+        var updatedProduct = new UpdateProductRequest
         {
             Id = 1,
-            Name = "PC Gamer Actualizado",
-            Description = "Computador de alto rendimiento",
-            Price = 2500.00m
+            Name = "Producto actualizado",
+            Description = "Descripción actualizada",
+            Price = 200m
         };
 
         // ACT: actualizar el producto

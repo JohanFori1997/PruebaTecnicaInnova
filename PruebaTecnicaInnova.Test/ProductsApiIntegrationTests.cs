@@ -1,11 +1,12 @@
-﻿using System.Net;
-using System.Net.Http.Json;
-using PruebaTecnicaInnova.Models;
-using Microsoft.AspNetCore.Mvc.Testing;
+﻿using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using PruebaTecnicaInnova.Dtos;
+using PruebaTecnicaInnova.Models;
 using PruebaTecnicaInnova.Repositories;
+using System.Net;
+using System.Net.Http.Json;
 
 namespace PruebaTecnicaInnova.Test;
 
@@ -125,4 +126,26 @@ public class ProductsApiIntegrationTests
         Assert.Equal(newProduct.Price, savedProduct.Price);
     }
 
+    [Fact]
+    public async Task PutProduct_MismatchedIds_Returns400()
+    {
+        // ARRANGE
+        var request = new UpdateProductRequest
+        {
+            Id = 2,
+            Name = "Producto actualizado",
+            Description = "Prueba de IDs diferentes",
+            Price = 150m
+        };
+
+        // ACT: el ID de la URL es diferente al del cuerpo
+        var response = await _client.PutAsJsonAsync(
+            "/api/Products/1",
+            request);
+
+        // ASSERT
+        Assert.Equal(
+            HttpStatusCode.BadRequest,
+            response.StatusCode);
+    }
 }

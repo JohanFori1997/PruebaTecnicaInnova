@@ -82,27 +82,41 @@ namespace PruebaTecnicaInnova.Controllers
 
 
         // PUT api/Products/5
+
         [HttpPut("{id}")]
-        public async Task<IActionResult> PutProduct(int id, Product product)
+        public async Task<IActionResult> PutProduct(
+            int id,
+            [FromBody] UpdateProductRequest request)
         {
-            if (id != product.Id)
+            // Validar que el ID de la ruta y del cuerpo coincidan
+            if (id != request.Id)
             {
-                return BadRequest("El ID del producto no coincide con el ID en la URL.");
+                return BadRequest(
+                    "El ID del producto no coincide con el ID en la URL.");
             }
 
-            if (!ModelState.IsValid)
+            // Convertir el DTO en la entidad correspondiente
+            var product = new Product
             {
-                return BadRequest(ModelState);
-            }
+                Id = request.Id,
+                Name = request.Name,
+                Description = request.Description,
+                Price = request.Price
+            };
 
-            var updatedProduct = await _productRepository.UpdateProductAsync(product);
-            if (updatedProduct == null)
+            // Ejecutar la actualización mediante el repositorio
+            var updatedProduct =
+                await _productRepository.UpdateProductAsync(product);
+
+            if (updatedProduct is null)
             {
-                return NotFound($"No se encontró el producto con ID {id}.");
+                return NotFound(
+                    $"No se encontró el producto con ID {id}.");
             }
 
             return NoContent();
         }
+
 
         // DELETE api/Products/5
         [HttpDelete("{id}")]
